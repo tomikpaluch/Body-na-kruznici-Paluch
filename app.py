@@ -1,6 +1,6 @@
 # app.py
 import io
-from math import cos, sin, pi
+from math import pi
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -28,11 +28,12 @@ with st.sidebar:
 
     st.markdown("---")
     st.header("Export / autor")
-    author = st.text_input("Jméno autora", value="")
-    contact = st.text_input("Kontakt (email/telefon)", value="")
+    # >>> Předvyplněno jméno a kontakt autora <<<
+    author = st.text_input("Jméno autora", value="Tomáš Paluch")
+    contact = st.text_input("Kontakt (email/telefon)", value="tomikpaluch@gmail.com")
 
 st.markdown(
-    "Nastav parametry vlevo a klikni **Vykreslit**. Stáhnout můžeš PNG, SVG a PDF (PDF obsahuje parametry a autor/konakt)."
+    "Nastav parametry vlevo a klikni **Vykreslit**. Stáhnout můžeš PNG, SVG a PDF (PDF obsahuje parametry a autora/kontakt)."
 )
 
 if st.button("Vykreslit"):
@@ -40,24 +41,19 @@ if st.button("Vykreslit"):
 
 # --- Vykreslení pomocí matplotlib ---
 def create_figure(cx, cy, r, n, color, psize, start_deg, units_label, show_grid_flag):
-    # velikost figury (palců) — upravitelné
     fig, ax = plt.subplots(figsize=(8, 6))
-    # body
     start_rad = np.deg2rad(start_deg)
     angles = start_rad + np.linspace(0, 2 * pi, int(n), endpoint=False)
     xs = cx + r * np.cos(angles)
     ys = cy + r * np.sin(angles)
 
-    # kružnice
     circle = plt.Circle((cx, cy), r, fill=False, linewidth=1, color="#0b1220")
     ax.add_patch(circle)
 
-    # body a popisky indexů
     ax.scatter(xs, ys, s=(psize ** 2), color=color, edgecolors="black", linewidths=0.4, zorder=3)
     for i, (x, y) in enumerate(zip(xs, ys), start=1):
         ax.text(x + psize * 0.8, y + psize * 0.3, str(i), fontsize=9, zorder=4)
 
-    # osy a grid
     lim_margin = max(20, r * 0.2)
     xmin = min(cx - r, cx) - lim_margin
     xmax = max(cx + r, cx) + lim_margin
@@ -71,7 +67,6 @@ def create_figure(cx, cy, r, n, color, psize, start_deg, units_label, show_grid_
     if show_grid_flag:
         ax.grid(True, which="major", linestyle="--", linewidth=0.6)
 
-    # ticks with units
     x_ticks = ax.get_xticks()
     y_ticks = ax.get_yticks()
     ax.set_xticklabels([f"{t:g} {units_label}" if units_label else f"{t:g}" for t in x_ticks])
@@ -88,11 +83,9 @@ def create_figure(cx, cy, r, n, color, psize, start_deg, units_label, show_grid_
     return fig
 
 fig = create_figure(center_x, center_y, radius, n_points, point_color, point_size, start_angle, units, show_grid)
-
-# Zobrazit v aplikaci
 st.pyplot(fig)
 
-# --- Připrav soubory ke stažení (PNG, SVG, PDF) ---
+# --- Export soubory ---
 buf_png = io.BytesIO()
 fig.savefig(buf_png, format="png", dpi=200)
 buf_png.seek(0)
@@ -101,41 +94,34 @@ buf_svg = io.BytesIO()
 fig.savefig(buf_svg, format="svg")
 buf_svg.seek(0)
 
-# PDF creation: vložíme PNG do PDF + přidáme text s parametry
+# PDF export
 def create_pdf_bytes(img_bytes_io, params: dict):
-    # použijeme A4 landscape
     buffer = io.BytesIO()
-    # landscape A4
     width, height = landscape(A4)
     c = canvas.Canvas(buffer, pagesize=(width, height))
 
-    # header text
+    # Nadpis
     c.setFont("Helvetica-Bold", 14)
     c.drawString(30, height - 40, "Kružnice — vykreslení bodů")
 
+    # Autor + kontakt
     c.setFont("Helvetica", 10)
     c.drawString(30, height - 58, f"Autor: {params.get('author','—')}    Kontakt: {params.get('contact','—')}")
-    # add image (scale to fit)
+
+    # Obrázek
     img = Image.open(img_bytes_io)
     img_w, img_h = img.size
-    # convert px->points (~72 dpi). We rendered PNG at high DPI (200), so scale accordingly
-    # We'll fit image into page area
     max_w = width - 60
     max_h = height - 140
-    # imageReader supports PIL images or file-like
-    img_reader = ImageReader(img)
-
-    # compute scale
     ratio = min(max_w / img_w, max_h / img_h)
     render_w = img_w * ratio
     render_h = img_h * ratio
-
-    # place image
     x = (width - render_w) / 2
     y = (height - render_h) / 2 - 20
+    img_reader = ImageReader(img)
     c.drawImage(img_reader, x, y, width=render_w, height=render_h)
 
-    # další stránka s parametry
+    # Druhá stránka s parametry
     c.showPage()
     c.setFont("Helvetica-Bold", 12)
     c.drawString(30, height - 40, "Parametry úlohy")
@@ -154,16 +140,16 @@ def create_pdf_bytes(img_bytes_io, params: dict):
         c.drawString(40, line_y, f"{k}: {v}")
         line_y -= step
 
-    c.drawString(30, line_y - 10, f"Poznámka: soubor vygenerován aplikací Streamlit")
+    # pevná poznámka s podpisem
+    c.drawString(30, line_y - 20, "© Tomáš Paluch, 2025 — tomikpaluch@gmail.com")
     c.save()
     buffer.seek(0)
     return buffer
 
-# create PDF bytes using PNG image
-pdf_bytes_io = io.BytesIO(buf_png.getvalue())  # PIL can read this
+pdf_bytes_io = io.BytesIO(buf_png.getvalue())
 pdf_buffer = create_pdf_bytes(pdf_bytes_io, {
-    "author": author,Tomáš Paluch
-    "contact": contact,278215@vutbr.cz
+    "author": author,
+    "contact": contact,
     "center_x": center_x,
     "center_y": center_y,
     "radius": radius,
@@ -174,12 +160,11 @@ pdf_buffer = create_pdf_bytes(pdf_bytes_io, {
     "units": units,
 })
 
-# Stahování
 st.download_button("Stáhnout PNG", data=buf_png.getvalue(), file_name="kruznice_vykresleni.png", mime="image/png")
 st.download_button("Stáhnout SVG", data=buf_svg.getvalue(), file_name="kruznice_vykresleni.svg", mime="image/svg+xml")
 st.download_button("Stáhnout PDF", data=pdf_buffer.getvalue(), file_name="kruznice_vykresleni.pdf", mime="application/pdf")
 
-# --- Info & technologie ---
+# --- Info ---
 with st.expander("Info o aplikaci a použité technologie (klikni pro otevření)"):
     st.markdown("""
     **Popis:** Aplikace vykreslí kružnici a rovnoměrně rozmístěné body podle zadaných parametrů.
@@ -193,10 +178,9 @@ with st.expander("Info o aplikaci a použité technologie (klikni pro otevření
     **Export:**
     - PNG (bitmapa)
     - SVG (vektor)
-    - PDF (PDF obsahuje vložené PNG a stránku s parametry)
+    - PDF (PDF obsahuje vložené PNG a stránku s parametry + podpis autora)
     """)
 
-# --- Zobrazení tabulky souřadnic (volitelné) ---
 if st.checkbox("Ukázat tabulku souřadnic bodů"):
     start_rad = np.deg2rad(start_angle)
     angles = start_rad + np.linspace(0, 2 * pi, int(n_points), endpoint=False)
