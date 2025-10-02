@@ -162,8 +162,8 @@ def create_pdf_bytes(img_bytes_io, params: dict):
 # create PDF bytes using PNG image
 pdf_bytes_io = io.BytesIO(buf_png.getvalue())  # PIL can read this
 pdf_buffer = create_pdf_bytes(pdf_bytes_io, {
-    "author": author,
-    "contact": contact,
+    "author": author,Tomáš Paluch
+    "contact": contact,278215@vutbr.cz
     "center_x": center_x,
     "center_y": center_y,
     "radius": radius,
